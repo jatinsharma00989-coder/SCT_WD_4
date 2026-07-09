@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>To-Do Web App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --frame-1:#d7dadf;
+    --frame-2:#aeb3ba;
+    --board: #f8f4ea;
+    --board-line: rgba(31,111,214,0.055);
+    --ink: #2b2b2e;
+    --ink-soft: #5c5c62;
+    --ink-faint: #9a978c;
+    --card-bg: #ffffff;
+    --card-hover: #fdfaf1;
+
+    --marker-blue: #1f6fd6;
+    --marker-blue-dark: #17509e;
+    --marker-blue-soft: rgba(31,111,214,0.12);
+    --marker-red: #e2402c;
+    --marker-red-soft: rgba(226,64,44,0.12);
+    --marker-green: #2fa66b;
+    --marker-green-soft: rgba(47,166,107,0.12);
+    --marker-yellow: #f0b429;
+    --marker-yellow-soft: rgba(240,180,41,0.16);
+
+    --font-hand:'Kalam', cursive;
+    --font-body:'Inter', 'Segoe UI', sans-serif;
+    --font-mono:'JetBrains Mono', 'Consolas', monospace;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(255,255,255,0.5), transparent 40%),
+      linear-gradient(155deg, #cfd6e0, #9aa4b2 60%, #7c8794);
+    font-family: var(--font-body);
+    padding: 48px 20px;
+  }
+
+  /* ---- Whiteboard frame ---- */
+  .shell{
+    width: 460px;
+    max-width: 100%;
+    position: relative;
+    background: linear-gradient(155deg, var(--frame-1), var(--frame-2));
+    border-radius: 22px;
+    padding: 14px;
+    box-shadow:
+      0 40px 70px -25px rgba(20,25,35,0.55),
+      0 0 0 1px rgba(255,255,255,0.4) inset;
+  }
+  /* corner screws on the aluminum frame */
+  .shell::before, .shell::after{
+    content:"";
+    position:absolute;
+    width:7px; height:7px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 35%, #fff, #8b909a 70%, #6b707a);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  .shell::before{ top:9px; left:9px; }
+  .shell::after{ bottom:9px; right:9px; }
+
+  .board{
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 27px, var(--board-line) 28px),
+      var(--board);
+    border-radius: 14px;
+    padding: 20px 20px 18px;
+    position: relative;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15) inset;
+  }
+
+  /* magnet decoration, top-right of the board */
+  .magnet{
+    position:absolute;
+    top: -12px;
+    right: 28px;
+    width: 26px; height: 26px;
+    border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #ff8a70, var(--marker-red) 55%, #b12e1d 100%);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.35), 0 0 0 2px rgba(255,255,255,0.5) inset;
+    z-index:2;
+  }
+
+  .label{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding: 2px 2px 14px;
+    color: var(--ink);
+  }
+  .label .title{
+    font-family: var(--font-hand);
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--marker-blue-dark);
+    transform: rotate(-1deg);
+    display:inline-block;
+  }
+  .label .pin{
+    display:inline-block;
+    width:8px; height:8px;
+    border-radius:50%;
+    background: var(--marker-red);
+    margin-right:6px;
+  }
+  #sync-indicator{
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--ink-faint);
+    transition: color 0.2s ease;
+    align-self: flex-end;
+  }
+  #sync-indicator.saving{ color: var(--marker-blue); }
+  #sync-indicator.error{ color: var(--marker-red); }
+
+  /* ---- Add-task panel: styled like a taped-on sticky note ---- */
+  .add-panel{
+    background: linear-gradient(180deg, #fff6d1, #fdecad);
+    border-radius: 4px 4px 12px 12px;
+    padding: 16px 16px 14px;
+    margin: 4px 4px 20px;
+    box-shadow: 0 8px 18px -8px rgba(0,0,0,0.25), 0 1px 0 rgba(255,255,255,0.6) inset;
+    transform: rotate(-0.4deg);
+    position: relative;
+  }
+  .add-panel::before{
+    /* washi tape */
+    content:"";
+    position:absolute;
+    top:-10px; left:50%;
+    width:70px; height:20px;
+    margin-left:-35px;
+    background: rgba(31,111,214,0.35);
+    border: 1px solid rgba(31,111,214,0.15);
+    transform: rotate(-2deg);
+  }
+
+  .add-row1{
+    display:flex;
+    gap:8px;
+    margin-bottom:10px;
+  }
+
+  input[type="text"], input[type="date"], input[type="time"], select{
+    font-family: var(--font-body);
+    background: #ffffff;
+    border: 1.5px solid rgba(43,43,46,0.15);
+    border-radius: 9px;
+    color: var(--ink);
+    padding: 10px 12px;
+    font-size: 14px;
+    outline:none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  input[type="text"]:focus, input[type="date"]:focus, input[type="time"]:focus, select:focus{
+    border-color: var(--marker-blue);
+  }
+  input::placeholder{ color: var(--ink-faint); font-family: var(--font-body); }
+  input[type="date"], input[type="time"]{ color-scheme: light; }
+
+  #task-input{ flex:1; min-width:0; font-family: var(--font-hand); font-size:16px; }
+
+  .add-row2{
+    display:flex;
+    gap:8px;
+  }
+  .add-row2 > *{ flex:1; min-width:0; }
+
+  select#priority-select{ flex: 0 0 110px; cursor:pointer; }
+
+  .btn{
+    border:none;
+    border-radius: 9px;
+    font-family: var(--font-body);
+    font-weight:700;
+    font-size: 14px;
+    cursor:pointer;
+    transition: background 0.12s ease, transform 0.05s ease;
+    white-space:nowrap;
+  }
+  .btn:active{ transform: scale(0.96); }
+  .btn.primary{ background: var(--marker-blue); color:#fff; padding: 10px 18px; }
+  .btn.primary:hover{ background: var(--marker-blue-dark); }
+  .btn.primary:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
+
+  /* ---- Filters / sort — styled like bookmark tabs ---- */
+  .toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom: 14px;
+    gap: 8px;
+    padding: 0 2px;
+  }
+  .filters{
+    display:flex;
+    gap:6px;
+  }
+  .filter-btn{
+    border:none;
+    background: rgba(43,43,46,0.06);
+    color: var(--ink-soft);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight:600;
+    padding: 7px 12px;
+    border-radius: 8px 8px 3px 3px;
+    cursor:pointer;
+    transition: all 0.15s ease;
+  }
+  .filter-btn:hover{ background: rgba(43,43,46,0.11); color: var(--ink); }
+  .filter-btn.active{
+    background: var(--marker-blue-soft);
+    color: var(--marker-blue-dark);
+    box-shadow: 0 2px 0 var(--marker-blue) inset;
+  }
+
+  #sort-select{
+    font-size:12px;
+    padding: 7px 10px;
+    cursor:pointer;
+    background: rgba(43,43,46,0.06);
+    border: none;
+  }
+
+  /* ---- Task list ---- */
+  .task-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-bottom: 16px;
+    min-height: 60px;
+  }
+
+  .empty-state{
+    text-align:center;
+    color: var(--ink-faint);
+    font-family: var(--font-hand);
+    font-size: 16px;
+    padding: 30px 10px;
+  }
+
+  .task{
+    background: var(--card-bg);
+    border-radius: 3px 12px 12px 3px;
+    padding: 12px 14px;
+    display:flex;
+    align-items:flex-start;
+    gap: 10px;
+    transition: background 0.15s ease, transform 0.1s ease;
+    box-shadow: -3px 0 0 var(--marker-blue), 0 3px 8px -4px rgba(0,0,0,0.2);
+  }
+  .task:hover{ background: var(--card-hover); transform: translateX(1px); }
+  .task.completed{ box-shadow: -3px 0 0 var(--marker-green), 0 3px 8px -4px rgba(0,0,0,0.2); opacity: 0.75; }
+  .task.completed .task-text{
+    color: var(--ink-faint);
+    text-decoration: line-through;
+    text-decoration-style: wavy;
+    text-decoration-color: var(--marker-green);
+    text-decoration-thickness: 1.5px;
+  }
+
+  .checkbox{
+    flex: 0 0 auto;
+    width: 21px; height: 21px;
+    border-radius: 50%;
+    border: 2px solid var(--ink-faint);
+    background: transparent;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-top: 1px;
+    transition: all 0.15s ease;
+    padding:0;
+  }
+  .checkbox:hover{ border-color: var(--marker-blue); }
+  .checkbox.checked{
+    background: var(--marker-green);
+    border-color: var(--marker-green);
+  }
+  .checkbox svg{ opacity:0; width:12px; height:12px; }
+  .checkbox.checked svg{ opacity:1; }
+
+  .task-body{ flex:1; min-width:0; }
+  .task-text{
+    color: var(--ink);
+    font-family: var(--font-hand);
+    font-size: 17px;
+    line-height: 1.3;
+    word-break: break-word;
+    cursor: pointer;
+  }
+
+  .task-meta{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:6px;
+    flex-wrap:wrap;
+  }
+
+  /* priority shown as a little marker-cap chip */
+  .priority-dot{
+    width:12px; height:8px;
+    border-radius: 2px 2px 3px 3px;
+    flex: 0 0 auto;
+    transform: rotate(-4deg);
+  }
+  .priority-dot.low{ background: var(--marker-blue); }
+  .priority-dot.medium{ background: var(--marker-yellow); }
+  .priority-dot.high{ background: var(--marker-red); }
+
+  .due-chip{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: rgba(43,43,46,0.05);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px dashed rgba(43,43,46,0.25);
+  }
+  .due-chip.overdue{ color: var(--marker-red); background: var(--marker-red-soft); border-color: rgba(226,64,44,0.4); }
+  .due-chip.today{ color: #8a6403; background: var(--marker-yellow-soft); border-color: rgba(240,180,41,0.5); }
+
+  .task-actions{
+    display:flex;
+    gap:2px;
+    flex: 0 0 auto;
+  }
+  .icon-btn{
+    border:none;
+    background:transparent;
+    color: var(--ink-faint);
+    cursor:pointer;
+    padding: 4px;
+    border-radius: 8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition: all 0.15s ease;
+  }
+  .icon-btn:hover{ background: rgba(43,43,46,0.08); color: var(--ink); }
+  .icon-btn.delete-btn:hover{ color: var(--marker-red); }
+  .icon-btn svg{ width:16px; height:16px; }
+
+  /* ---- Inline edit mode ---- */
+  .edit-form{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    flex:1;
+  }
+  .edit-form .edit-row{
+    display:flex;
+    gap:6px;
+  }
+  .edit-form .edit-row > *{ flex:1; min-width:0; }
+  .edit-form input, .edit-form select{ padding: 8px 10px; font-size:13px; font-family: var(--font-body); }
+  .edit-actions{
+    display:flex;
+    gap:6px;
+    justify-content:flex-end;
+  }
+  .edit-actions .btn{ padding: 6px 12px; font-size:12px; }
+  .btn.secondary{ background: rgba(43,43,46,0.06); color: var(--ink-soft); }
+  .btn.secondary:hover{ background: rgba(43,43,46,0.11); color: var(--ink); }
+
+  /* ---- Footer ---- */
+  .footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding: 4px 2px 0;
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+  #clear-completed{
+    background:transparent;
+    border:none;
+    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    cursor:pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    padding:0;
+  }
+  #clear-completed:hover{ color: var(--marker-red); }
+  #clear-completed:disabled{ color: var(--ink-faint); text-decoration:none; cursor:default; }
+
+  @media (max-width: 480px){
+    .add-row2{ flex-wrap: wrap; }
+    select#priority-select{ flex: 1 1 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="magnet"></div>
+  <div class="board">
+    <div class="label">
+      <span><span class="pin"></span><span class="title">To-Do Board</span></span>
+      <span id="sync-indicator">READY</span>
+    </div>
+
+    <div class="add-panel">
+      <div class="add-row1">
+        <input type="text" id="task-input" placeholder="What needs doing?" maxlength="200" />
+        <button class="btn primary" id="add-btn">Add</button>
+      </div>
+      <div class="add-row2">
+        <input type="date" id="date-input" aria-label="Due date">
+        <input type="time" id="time-input" aria-label="Due time">
+        <select id="priority-select" aria-label="Priority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="active">Active</button>
+        <button class="filter-btn" data-filter="completed">Completed</button>
+      </div>
+      <select id="sort-select" aria-label="Sort by">
+        <option value="created">Newest</option>
+        <option value="due">Due date</option>
+        <option value="priority">Priority</option>
+      </select>
+    </div>
+
+    <div class="task-list" id="task-list"></div>
+
+    <div class="footer">
+      <span id="remaining-count">0 tasks left</span>
+      <button id="clear-completed">Clear completed</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // Storage layer: uses the Claude artifact persistent key-value store
+  // when available (window.storage), and falls back to a plain in-memory
+  // array if this file is opened as a standalone HTML file in a normal
+  // browser (where window.storage doesn't exist). Either way the app
+  // works; only the "does it survive a refresh" behavior differs.
+  // ---------------------------------------------------------------------
+  const STORAGE_KEY = "todo-tasks-v1";
+  const hasPersistentStorage = typeof window.storage !== "undefined" && window.storage !== null;
+  let memoryFallback = []; // used only if window.storage is unavailable
+
+  async function loadTasks(){
+    if (!hasPersistentStorage) return memoryFallback;
+    try {
+      const result = await window.storage.get(STORAGE_KEY, false);
+      if (!result || !result.value) return [];
+      const parsed = JSON.parse(result.value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err){
+      // Key not found yet, or a read error — treat as an empty list.
+      return [];
+    }
+  }
+
+  async function saveTasks(tasks){
+    if (!hasPersistentStorage){
+      memoryFallback = tasks;
+      return true;
+    }
+    setSyncStatus("saving");
+    try {
+      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(tasks), false);
+      setSyncStatus(result ? "saved" : "error");
+      return !!result;
+    } catch (err){
+      setSyncStatus("error");
+      return false;
+    }
+  }
+
+  function setSyncStatus(kind){
+    const el = document.getElementById("sync-indicator");
+    el.classList.remove("saving", "error");
+    if (kind === "saving"){ el.textContent = "SAVING…"; el.classList.add("saving"); }
+    else if (kind === "saved"){ el.textContent = hasPersistentStorage ? "SAVED" : "READY"; }
+    else if (kind === "error"){ el.textContent = "SAVE FAILED"; el.classList.add("error"); }
+    else { el.textContent = "READY"; }
+  }
+
+  // ---------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------
+  let tasks = [];              // { id, text, completed, due (ISO string|null), priority }
+  let currentFilter = "all";   // 'all' | 'active' | 'completed'
+  let currentSort = "created"; // 'created' | 'due' | 'priority'
+  let editingId = null;
+
+  const el = {
+    input: document.getElementById("task-input"),
+    dateInput: document.getElementById("date-input"),
+    timeInput: document.getElementById("time-input"),
+    prioritySelect: document.getElementById("priority-select"),
+    addBtn: document.getElementById("add-btn"),
+    list: document.getElementById("task-list"),
+    remainingCount: document.getElementById("remaining-count"),
+    clearCompleted: document.getElementById("clear-completed"),
+    sortSelect: document.getElementById("sort-select"),
+    filterBtns: document.querySelectorAll(".filter-btn")
+  };
+
+  function uid(){
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function combineDueDateTime(dateStr, timeStr){
+    if (!dateStr) return null;
+    return `${dateStr}T${timeStr || "23:59"}`;
+  }
+
+  // ---------------------------------------------------------------------
+  // CRUD actions
+  // ---------------------------------------------------------------------
+  async function addTask(){
+    const text = el.input.value.trim();
+    if (!text) { el.input.focus(); return; }
+
+    const task = {
+      id: uid(),
+      text,
+      completed: false,
+      due: combineDueDateTime(el.dateInput.value, el.timeInput.value),
+      priority: el.prioritySelect.value,
+      createdAt: Date.now()
+    };
+    tasks.push(task);
+
+    el.input.value = "";
+    el.dateInput.value = "";
+    el.timeInput.value = "";
+    el.prioritySelect.value = "medium";
+    el.input.focus();
+
+    render();
+    await saveTasks(tasks);
+  }
+
+  async function toggleComplete(id){
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+    t.completed = !t.completed;
+    render();
+    await saveTasks(tasks);
+  }
+
+  async function deleteTask(id){
+    tasks = tasks.filter(x => x.id !== id);
+    render();
+    await saveTasks(tasks);
+  }
+
+  async function clearCompleted(){
+    tasks = tasks.filter(x => !x.completed);
+    render();
+    await saveTasks(tasks);
+  }
+
+  function startEdit(id){
+    editingId = id;
+    render();
+  }
+
+  function cancelEdit(){
+    editingId = null;
+    render();
+  }
+
+  async function saveEdit(id, newText, newDate, newTime, newPriority){
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+    const trimmed = newText.trim();
+    if (!trimmed) return; // don't allow saving an empty task
+    t.text = trimmed;
+    t.due = combineDueDateTime(newDate, newTime);
+    t.priority = newPriority;
+    editingId = null;
+    render();
+    await saveTasks(tasks);
+  }
+
+  // ---------------------------------------------------------------------
+  // Derived helpers
+  // ---------------------------------------------------------------------
+  function dueStatus(dueISO){
+    if (!dueISO) return null;
+    const due = new Date(dueISO);
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfDueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+
+    if (due < now) return "overdue";
+    if (startOfDueDay.getTime() === startOfToday.getTime()) return "today";
+    return "upcoming";
+  }
+
+  function formatDue(dueISO){
+    const due = new Date(dueISO);
+    const dateStr = due.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const timeStr = due.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    return `${dateStr} · ${timeStr}`;
+  }
+
+  const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
+
+  function getVisibleTasks(){
+    let list = tasks.slice();
+
+    if (currentFilter === "active") list = list.filter(t => !t.completed);
+    if (currentFilter === "completed") list = list.filter(t => t.completed);
+
+    if (currentSort === "due"){
+      list.sort((a, b) => {
+        if (!a.due && !b.due) return 0;
+        if (!a.due) return 1;
+        if (!b.due) return -1;
+        return new Date(a.due) - new Date(b.due);
+      });
+    } else if (currentSort === "priority"){
+      list.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
+    } else {
+      list.sort((a, b) => b.createdAt - a.createdAt);
+    }
+
+    return list;
+  }
+
+  // ---------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------
+  function render(){
+    const visible = getVisibleTasks();
+    el.list.innerHTML = "";
+
+    if (visible.length === 0){
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = tasks.length === 0
+        ? "Nothing on your list yet — add your first task above."
+        : "No tasks match this filter.";
+      el.list.appendChild(empty);
+    } else {
+      visible.forEach(task => el.list.appendChild(
+        editingId === task.id ? buildEditRow(task) : buildTaskRow(task)
+      ));
+    }
+
+    const remaining = tasks.filter(t => !t.completed).length;
+    el.remainingCount.textContent = `${remaining} task${remaining === 1 ? "" : "s"} left`;
+    el.clearCompleted.disabled = tasks.every(t => !t.completed);
+  }
+
+  function buildTaskRow(task){
+    const row = document.createElement("div");
+    row.className = "task" + (task.completed ? " completed" : "");
+
+    const checkbox = document.createElement("button");
+    checkbox.className = "checkbox" + (task.completed ? " checked" : "");
+    checkbox.setAttribute("aria-label", task.completed ? "Mark as not done" : "Mark as done");
+    checkbox.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    checkbox.addEventListener("click", () => toggleComplete(task.id));
+    row.appendChild(checkbox);
+
+    const body = document.createElement("div");
+    body.className = "task-body";
+
+    const text = document.createElement("div");
+    text.className = "task-text";
+    text.textContent = task.text;
+    text.title = "Click to edit";
+    text.addEventListener("click", () => startEdit(task.id));
+    body.appendChild(text);
+
+    const meta = document.createElement("div");
+    meta.className = "task-meta";
+
+    const dot = document.createElement("span");
+    dot.className = `priority-dot ${task.priority}`;
+    meta.appendChild(dot);
+
+    if (task.due){
+      const chip = document.createElement("span");
+      const status = dueStatus(task.due);
+      chip.className = "due-chip" + (status && !task.completed ? ` ${status}` : "");
+      chip.textContent = formatDue(task.due);
+      meta.appendChild(chip);
+    }
+
+    body.appendChild(meta);
+    row.appendChild(body);
+
+    const actions = document.createElement("div");
+    actions.className = "task-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "icon-btn edit-btn";
+    editBtn.setAttribute("aria-label", "Edit task");
+    editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>`;
+    editBtn.addEventListener("click", () => startEdit(task.id));
+    actions.appendChild(editBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "icon-btn delete-btn";
+    delBtn.setAttribute("aria-label", "Delete task");
+    delBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path></svg>`;
+    delBtn.addEventListener("click", () => deleteTask(task.id));
+    actions.appendChild(delBtn);
+
+    row.appendChild(actions);
+    return row;
+  }
+
+  function buildEditRow(task){
+    const row = document.createElement("div");
+    row.className = "task";
+
+    const form = document.createElement("div");
+    form.className = "edit-form";
+
+    const row1 = document.createElement("div");
+    row1.className = "edit-row";
+    const textInput = document.createElement("input");
+    textInput.type = "text";
+    textInput.value = task.text;
+    textInput.maxLength = 200;
+    row1.appendChild(textInput);
+    form.appendChild(row1);
+
+    const row2 = document.createElement("div");
+    row2.className = "edit-row";
+
+    const dateInput = document.createElement("input");
+    dateInput.type = "date";
+    const timeInput = document.createElement("input");
+    timeInput.type = "time";
+    if (task.due){
+      const d = new Date(task.due);
+      dateInput.value = d.toISOString().slice(0, 10);
+      timeInput.value = d.toTimeString().slice(0, 5);
+    }
+    const prioritySelect = document.createElement("select");
+    ["low", "medium", "high"].forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p[0].toUpperCase() + p.slice(1);
+      if (p === task.priority) opt.selected = true;
+      prioritySelect.appendChild(opt);
+    });
+
+    row2.appendChild(dateInput);
+    row2.appendChild(timeInput);
+    row2.appendChild(prioritySelect);
+    form.appendChild(row2);
+
+    const actions = document.createElement("div");
+    actions.className = "edit-actions";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn secondary";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", cancelEdit);
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "btn primary";
+    saveBtn.textContent = "Save";
+    saveBtn.addEventListener("click", () =>
+      saveEdit(task.id, textInput.value, dateInput.value, timeInput.value, prioritySelect.value)
+    );
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+    form.appendChild(actions);
+
+    row.appendChild(form);
+
+    // Convenience: Enter saves, Escape cancels, while editing the text field.
+    textInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveEdit(task.id, textInput.value, dateInput.value, timeInput.value, prioritySelect.value);
+      if (e.key === "Escape") cancelEdit();
+    });
+
+    setTimeout(() => textInput.focus(), 0);
+    return row;
+  }
+
+  // ---------------------------------------------------------------------
+  // Event wiring
+  // ---------------------------------------------------------------------
+  el.addBtn.addEventListener("click", addTask);
+  el.input.addEventListener("keydown", (e) => { if (e.key === "Enter") addTask(); });
+  el.clearCompleted.addEventListener("click", clearCompleted);
+
+  el.filterBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentFilter = btn.dataset.filter;
+      el.filterBtns.forEach(b => b.classList.toggle("active", b === btn));
+      render();
+    });
+  });
+
+  el.sortSelect.addEventListener("change", () => {
+    currentSort = el.sortSelect.value;
+    render();
+  });
+
+  // ---------------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------------
+  (async function init(){
+    setSyncStatus(null);
+    tasks = await loadTasks();
+    render();
+  })();
+})();
+</script>
+
+</body>
+</html>
